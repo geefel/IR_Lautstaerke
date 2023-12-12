@@ -1,6 +1,6 @@
 # IR_Lautstaerke
-unitimedia-Fernbedienung
-Protokol: SAMSG32 = Samsung32
+unitimedia-Fernbedienung\n
+Protokol: SAMSG32 = Samsung32\n
  ID           = 0x0707
  Vol +        = 0x0708
  Vol -        = 0x0BF4
