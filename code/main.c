@@ -1,10 +1,10 @@
 #include <util/delay.h>
 #include <avr/interrupt.h>
-#include "uart_hard.h"
 #include "ir_Samsung32.h"
+#include "usi.h"
 
-int main(void) {	
-	
+#define AUDIO_SW_PIN PINDEF(B, 3)
+
 union _erg {
 	uint8_t ergAr[4];
 	uint16_t ergParaVal[2];
@@ -20,8 +20,104 @@ enum paraVal {
 	muteOnOff = 0x0FF0
 };
 
+enum audioChanel {
+	chanel1 = 1,
+	chanel2 = 0
+};
+
+enum mute {
+	isNotMute = 0,
+	isMute = 1
+};
+
+enum levelMaxMin {
+	audioLevelMin = 0,
+	audioLevelMax = 255
+};
+
+enum MCP42010_Command {
+	noCommand1   = 0b00000000,
+	writeData    = 0b00010000,
+	shutdown     = 0b00100000,
+	noCommand2   = 0b00110000,
+	selectNon    = 0b00000000,
+	selectPot0   = 0b00000001,
+	selectPot1   = 0b00000010,
+	selectPotAll = 0b00000011
+};
+
+const uint8_t audioLevelStep = 1;
+
+uint8_t muteStatus = isMute;
+uint8_t audioInChanel = chanel1;
+int16_t audioLevel = audioLevelMin;
+
+void setAudioIn(uint8_t aIn);
+void switchAudioIn();
+void setAudioLevelPlus();
+void setAudioLevelMinus();
+void setMute();
+void sendAudioLevel(int16_t lvl);
+uint8_t sendDataToUsi(uint8_t dat[2]);
+
+//AUDIO_SW_PIN = HIGH: Chanel 1 ist an, Channel 2 ist aus
+//AUDIO_SW_PIN = LOW : Chanel 2 ist an, Channel 1 ist aus
+void setAudioIn(uint8_t aIn) {
+	if (aIn == chanel1)
+		setPin(AUDIO_SW_PIN);	
+	else if (aIn == chanel2)
+		clrPin(AUDIO_SW_PIN);
+}
+
+void switchAudioIn() {
+	audioInChanel = audioInChanel == chanel1 ? chanel2 : chanel1;
+	setAudioIn(audioInChanel);
+}
+
+void setAudioLevelPlus() {
+	audioLevel += audioLevelStep;
+	if (audioLevel > audioLevelMax)
+		audioLevel = audioLevelMax;
+	sendAudioLevel(audioLevel);
+}
+
+void setAudioLevelMinus() {
+	audioLevel -= audioLevelStep;
+	if (audioLevel < audioLevelMin) 
+		audioLevel = audioLevelMin;
+	sendAudioLevel(audioLevel);
+}
+
+void setMute() {
+	muteStatus = muteStatus == isNotMute ? isMute : isNotMute;
+	if (muteStatus == isNotMute)
+		sendAudioLevel(audioLevel);
+	else if (muteStatus == isMute)
+		sendAudioLevel(audioLevelMin);
+}
+
+void sendAudioLevel(int16_t lvl) {
+	uint8_t dat[2];
+	dat[0] = writeData | selectPotAll;
+	dat[1] = (uint8_t)(lvl & 255);
+	sendDataToUsi(dat);	
+}
+
+uint8_t sendDataToUsi(uint8_t dat[2]) {
+	clrCS_PIN();			//Abhängig von Usi-Mode
+	transferUsi(dat[0]);
+	transferUsi(dat[1]);
+	setCS_PIN();			//Abhängig von Usi-Mode
+	return 1;
+}
+
+int main(void) {
 	setupIR();
-	initUartHW(9600);
+	
+	initUSI();
+	setDataMode(USI_MODE0);	//Digital-Poti MCP41XXX/42XXX hat SPI-Mode 0
+	
+	setAudioIn(chanel1);
 	
 	resetRepeatData();
 	dataMain.erg32 = 0;
@@ -33,31 +129,21 @@ enum paraVal {
 			dataMain.erg32 = getData();
 			if (dataMain.ergParaVal[0] == id) {
 				switch (dataMain.ergParaVal[1]) {
-					case id: ; break;
-					case input: ; break;
-					case tv: ; break;
-					case volPlus: ; break;
-					case volMinus: ; break;
-					case muteOnOff: ; break;
-					default: ; break;
+					case input:     switchAudioIn();      break;
+					case tv:                           ;  break;
+					case volPlus:   setAudioLevelPlus();  break;
+					case volMinus:  setAudioLevelMinus(); break;
+					case muteOnOff: setMute();            break;
+					default: ;                            break;
 				}
 			} 
-			//~ uart_Transmit_Hard(dataMain.ergAr[0]);
-			//~ uart_Transmit_Hard(dataMain.ergAr[1]);
-			//~ uart_Transmit_Hard(dataMain.ergAr[2]);
-			//~ uart_Transmit_Hard(dataMain.ergAr[3]);
 			resetNewIR();
 			clearData();	//löscht data in ir.c!!!
 		}
-		//~ else if(getRepeatData()) {
-			//~ //uart_Transmit_Hard(dataMain.ergAr[2]);
-			//~ resetRepeatData();
-		//~ }
 		
 		//schlafen();
 		
-	}
-	
+	}	
 }
 
 

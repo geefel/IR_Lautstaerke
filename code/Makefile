@@ -1,13 +1,20 @@
-SRCS=main.c ir_Samsung32.c uart_hard.c
+SRCS=main.c ir_Samsung32.c usi.c
 TARGET=IR_ATmega
 
 #ATmega48A/PA/88A/PA/168A/PA/328/P
-MCU=atmega328p
-AVRDUDE_MCU=m328p
-F_CPU=16000000
-BAUD=115200
-PORT=/dev/ttyACM0
+#MCU=atmega328p
+#AVRDUDE_MCU=m328p
+#F_CPU=16000000
+#BAUD=115200
+#PORT=/dev/ttyACM0
 #ende ATmega
+
+#ATtiny25/45/85
+MCU=attiny45
+AVRDUDE_MCU=ATtiny45
+F_CPU=8000000
+BAUD=9600
+#ende ATtiny
 
 PROGR=arduino
 CC=avr-gcc
@@ -36,6 +43,7 @@ file:
 	${CC} ${CFLAGS} -o ${TARGET}.bin ${SRCS}
 	${OBJCOPY} -j .text -j .data -O ihex ${TARGET}.bin ${TARGET}.hex
 	avr-size --format=avr --mcu=${MCU} ${TARGET}.bin
+	rm -f *.bin *.hex *.o
 	
 asm:
 	${CC} ${CFLAGS} -fno-asynchronous-unwind-tables -fno-exceptions -fno-rtti -fverbose-asm \

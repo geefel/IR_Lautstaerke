@@ -78,13 +78,13 @@ void setupIR() {
 }
 
 void setupInt0() {
-	EICRA = 1 << ISC01;
-	EIMSK|= 1 << INT0;
+	MCUCR |= 1 << ISC01;
+	GIMSK |= 1 << INT0;
 }
 
 void setupTimer(){ 
 	TCCR0A = 1 << WGM01;
-	TIMSK0 |= 1 << OCIE0A;       // Enable output compare interrupt
+	TIMSK |= 1 << OCIE0A;       // Enable output compare interrupt
     stopTimer();
     OCR0A = 13;                // 112,38 µs
 }
