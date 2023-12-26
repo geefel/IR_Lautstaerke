@@ -2,6 +2,7 @@
 #include <avr/interrupt.h>
 #include "ir_Samsung32.h"
 #include "usi.h"
+#include "main.h"
 
 #define AUDIO_SW_PIN PINDEF(B, 3)
 
@@ -13,7 +14,7 @@ union _erg {
 
 enum paraVal {
 	id        = 0x0707,
-	input	  = 0x01FE,	//-[->]
+	input	    = 0x01FE,	//-[->]
 	tv        = 0x02FD,
 	volPlus   = 0x0708,
 	volMinus  = 0x0BF4,
@@ -51,6 +52,38 @@ const uint8_t audioLevelStep = 1;
 uint8_t muteStatus = isMute;
 uint8_t audioInChanel = chanel1;
 int16_t audioLevel = audioLevelMin;
+
+void test() {
+	uint8_t maske1 = 1;
+	dataMain.erg32 = 0x0f070301;
+	for (int j = 0; j < 4; ++j) {
+		for (int i = 0; i < 8; ++i) {
+			if (dataMain.ergAr[j] & maske1) {
+				clrPin(AUDIO_SW_PIN);
+				_delay_ms(2);
+				setPin(AUDIO_SW_PIN);
+				_delay_ms(1);
+			}
+			else {
+				clrPin(AUDIO_SW_PIN);
+				_delay_ms(1);
+				setPin(AUDIO_SW_PIN);
+				_delay_ms(1);
+			}
+			maske1 <<= 1;
+			
+		}
+		//~ clrPin(AUDIO_SW_PIN);
+		//~ _delay_ms(4);
+		setPin(AUDIO_SW_PIN);
+		_delay_ms(4);
+		maske1 = 1;
+	}
+	clrPin(AUDIO_SW_PIN);
+	_delay_ms(1);
+	setPin(AUDIO_SW_PIN);
+	_delay_ms(1);
+}
 
 void setAudioIn(uint8_t aIn);
 void switchAudioIn();
@@ -126,15 +159,16 @@ int main(void) {
 	
 	while(1) {
 		if(getNewIR()) {
-			dataMain.erg32 = getData();
-			if (dataMain.ergParaVal[0] == id) {
+			dataMain.erg32 = 0x0707;test();
+			if (dataMain.erg32 == id) 
+			if (dataMain.ergParaVal[0] == 0) {//test();
 				switch (dataMain.ergParaVal[1]) {
 					case input:     switchAudioIn();      break;
 					case tv:                           ;  break;
 					case volPlus:   setAudioLevelPlus();  break;
 					case volMinus:  setAudioLevelMinus(); break;
 					case muteOnOff: setMute();            break;
-					default: ;                            break;
+					default: test();  break;
 				}
 			} 
 			resetNewIR();

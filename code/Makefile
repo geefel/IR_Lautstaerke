@@ -14,6 +14,7 @@ MCU=attiny45
 AVRDUDE_MCU=ATtiny45
 F_CPU=8000000
 BAUD=9600
+PORT=/dev/ttyUSB0
 #ende ATtiny
 
 PROGR=arduino

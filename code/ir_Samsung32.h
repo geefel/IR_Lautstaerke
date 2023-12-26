@@ -3,7 +3,7 @@
 
 #include "pin.h"
 
-#define TEST_PIN PINDEF(D, 3)
+#define IR_PIN PINDEF(B, 4)
 
 void setupIR();
 void resetNewIR();

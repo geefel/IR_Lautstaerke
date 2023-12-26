@@ -7,7 +7,7 @@
  * Es wird eine 16-bit Adresse und ein 16-bit Komando(Taste) übermittelt, beide LSB. Bei NEC sind die Komandos aber nur 8-bit lang, 
  * d.h. man kann die letzten 8 Bits ignorieren.
  * 
- * Protocol=Samsung32 Address=0x070 32 bits LSB first
+ * Protocol=Samsung32 Address=0x0707 32 bits LSB first
  *	
  * Frequenz 	    38 kHz
  * Kodierung 	  	Pulse Distance
@@ -42,6 +42,7 @@
 #include <avr/io.h>
 #include "ir_Samsung32.h"
 #include "uart_hard.h"
+#include "main.h"
 
 #define ENDE_IR			0
 #define BIT_IR 			1
@@ -65,7 +66,8 @@ union {
 } data;
 
 void setupTimer();
-void setupInt0();
+//void setupInt0();
+void setupPCINT();
 void startTimer();
 void stopTimer();
 void setNewIR();
@@ -73,13 +75,18 @@ void setRepeatData();
 uint16_t getTime();
 
 void setupIR() {
-	setupInt0();
+	//setupInt0();
+	setupPCINT();
 	setupTimer();
 }
+	//Umgeschrieben für PCINT4
+	void setupPCINT() {
+//void setupInt0() {
+	//~ MCUCR |= 1 << ISC01;
+	//~ GIMSK |= 1 << INT0;
 
-void setupInt0() {
-	MCUCR |= 1 << ISC01;
-	GIMSK |= 1 << INT0;
+	GIMSK |= (1 << PCIE);
+	PCMSK = 0b00010000;
 }
 
 void setupTimer(){ 
@@ -133,53 +140,58 @@ ISR(TIMER0_COMPA_vect){
 	ti++;
 }
 
-ISR(INT0_vect){
-	static uint8_t maske = 1;
+const uint8_t startMaske = 0b00000001;
+
+//ISR(INT0_vect){
+ISR(PCINT0_vect){
+	static uint8_t maske = startMaske;
 	static uint8_t bitA = 0;
 	static uint8_t bitB = 0;
 	static uint8_t t = 0;
 	static uint8_t status = ENDE_IR;
-
-	switch (status) {
-		
-		case ENDE_IR:
-			startTimer();
-			ti = 0;
-			status = BIT_IR;
-			break;
+	
+if (!getPin(IR_PIN)) {
+		switch (status) {
 			
-		case BIT_IR:			//erstes Datenbit beginnt hier
-			t = ti;
-			ti = 0;
-			status = BIT_START;
-			//~ if (t < IF_START_WIEDERHOLUNG)	{		//Wiederholung erkannt, Beginn Stopbit
-				//~ status = ENDE_IR;
-				//~ setRepeatData();
-				//~ stopTimer();
-			//~ }
-			break;
-									
-		case BIT_START:							//zweites Bit beginnt hier
-			t = ti;										//Auswertung des ersten Bit
-			ti = 0;
-			if (t > IF_BIT_1_BIT_0)		//40 für log 1 und 20 für log 0
-				data.ergAr[bitB] |= maske;
-			maske <<= 1;
-			bitA++;
-			if (bitA == 8) {					//data.ergAr[0,1,2] ist voll
-				maske = 1;
-				bitA = 0;
-				bitB++;
-			}
-			if (bitB == 4) {				//data.ergAr[3] ist voll, Stopbit hat begonnen
-				maske = 1;
-				bitA = 0;
-				bitB = 0;
-				status = ENDE_IR;
-				stopTimer();
-				setNewIR();
-			}
-			break;
+			case ENDE_IR:
+				startTimer();
+				ti = 0;
+				status = BIT_IR;
+				break;
+				
+			case BIT_IR:			//erstes Datenbit beginnt hier
+				t = ti;
+				ti = 0;
+				status = BIT_START;
+				//~ if (t < IF_START_WIEDERHOLUNG)	{		//Wiederholung erkannt, Beginn Stopbit
+					//~ status = ENDE_IR;
+					//~ setRepeatData();
+					//~ stopTimer();
+				//~ }
+				break;
+										
+			case BIT_START:							//zweites Bit beginnt hier
+				t = ti;										//Auswertung des ersten Bit
+				ti = 0;
+				if (t > IF_BIT_1_BIT_0)		//40 für log 1 und 20 für log 0
+					data.ergAr[bitB] |= maske;
+				maske <<= 1;
+				bitA++;
+				if (bitA == 8) {					//data.ergAr[0,1,2] ist voll
+					maske = startMaske;
+					bitA = 0;
+					bitB++;
+				}
+				if (bitB == 4) {					//data.ergAr[3] ist voll, Stopbit hat begonnen
+					maske = startMaske;
+					bitA = 0;
+					bitB = 0;
+					status = ENDE_IR;
+					stopTimer();
+					setNewIR();
+				}
+				break;
+		}
 	}
 }
 
