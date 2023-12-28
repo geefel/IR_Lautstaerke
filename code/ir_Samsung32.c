@@ -4,8 +4,7 @@
  * Es wird Puls-Distance-Dekoding benutzt, d.h. ein Bit beginnt mit einem HIGH fester Länge und einer variablen Länge LOW,
  * je nachdem ob eine 1 oder eine 0 dargestellt wird. Am Ende der Nachricht wird ein weiter letzter Puls gesendet.
  * 
- * Es wird eine 16-bit Adresse und ein 16-bit Komando(Taste) übermittelt, beide LSB. Bei NEC sind die Komandos aber nur 8-bit lang, 
- * d.h. man kann die letzten 8 Bits ignorieren.
+ * Es wird eine 16-bit Adresse und ein 16-bit Komando(Taste) übermittelt, beide LSB. 
  * 
  * Protocol=Samsung32 Address=0x0707 32 bits LSB first
  *	
@@ -15,17 +14,21 @@
  * Daten NEC 	  	16 Adress-Bits + 16 Kommando-Bits
  * Bit-Order 	  	LSB first 
  * 
- * Bei fallender Flanke und ATmega, 16000000Hz, Prescale 1, OCR0A = 13, 112,38 µs
- * Start-bit: 4,5ms	
- * Pause:			4,5ms
- * =					9ms	Count 163
+ * Bei fallender Flanke und ATtiny, 1000000Hz, Prescale 1/1, OCR0A = 12, 0,012 ms
+ * 
+ * Start-bit:	4,5ms	
+ * Pause:		4,5ms
+ * =			9ms		Count 750
+ * 
  * 0-bit: 		0,55ms
- * Pause:			0,55ms
- * =					1,1ms	Count 20
+ * Pause:		0,55ms
+ * =			1,1ms	Count 91,7
+ * 
  * 1-bit: 		0,55ms	
- * Pause:			1,65ms
- * =					2,2ms	Count 40
- * stop: 			0,55ms
+ * Pause:		1,65ms
+ * =			2,2ms	Count 183,3
+ * 
+ * stop: 		0,55ms	Count 45,8
  * 
  * Wiederholung
  * nach 47 ms
@@ -44,56 +47,52 @@
 #include "uart_hard.h"
 #include "main.h"
 
-#define ENDE_IR			0
-#define BIT_IR 			1
-#define BIT_START 	2
+const uint16_t start_laenge = 750;
+const uint16_t bit1_laenge = 183;
+const uint16_t bit0_laenge = 92;
 
-#define LAENGE_START 						163
-#define LAENGE_WIEDERHOLUNG 		204
-#define IF_START_WIEDERHOLUNG 	LAENGE_START + LAENGE_WIEDERHOLUNG / 2
 
-#define LAENGE_BIT_1 		39
-#define LAENGE_BIT_0 		20
-#define IF_BIT_1_BIT_0 	30	//LAENGE_BIT_1 + LAENGE_BIT_0 / 2
+volatile uint16_t ti;
+volatile uint16_t t;
+volatile uint8_t maske;
+volatile uint8_t bitCount;
+volatile uint8_t byteCount;
 
-static volatile uint16_t ti = 0;
-static volatile uint8_t newIR = 0;
-static volatile uint8_t repeatData = 0;
-
-union {
-	uint8_t ergAr[4];
-	uint32_t erg32;
-} data;
+volatile uint8_t newIR;
+volatile uint8_t repeatData;
+volatile uint8_t status;
 
 void setupTimer();
-//void setupInt0();
-void setupPCINT();
-void startTimer();
-void stopTimer();
+void setupInt0();
+
+uint8_t isTimerRunning();
 void setNewIR();
 void setRepeatData();
 uint16_t getTime();
 
 void setupIR() {
-	//setupInt0();
-	setupPCINT();
+	ti = 0;
+	newIR = 0;
+	repeatData = 0;
+	maske = 1;
+	bitCount = 0;
+	byteCount = 0;
+	t = 0;
+	
+	setupInt0();
 	setupTimer();
 }
-	//Umgeschrieben für PCINT4
-	void setupPCINT() {
-//void setupInt0() {
-	//~ MCUCR |= 1 << ISC01;
-	//~ GIMSK |= 1 << INT0;
 
-	GIMSK |= (1 << PCIE);
-	PCMSK = 0b00010000;
+void setupInt0() {
+	MCUCR |= 1 << ISC01;
+	GIMSK |= 1 << INT0;
 }
 
 void setupTimer(){ 
 	TCCR0A = 1 << WGM01;
 	TIMSK |= 1 << OCIE0A;       // Enable output compare interrupt
     stopTimer();
-    OCR0A = 13;                // 112,38 µs
+    OCR0A = 12;
 }
 
 void stopTimer() {
@@ -101,15 +100,14 @@ void stopTimer() {
 }
 
 void startTimer() {
-	TCCR0B = (1 << CS01) | (1 << CS00);
+	TCCR0B = (1 << CS00);
 }
 
-void clearData() {
-	data.erg32 = 0;
-}
-
-uint32_t getData() {
-	return data.erg32;
+uint8_t isTimerRunning() {
+	if (TCCR0B & ((1 << CS02) | (1 << CS01) | (1 << CS00)))
+		return 1;
+	else
+		return 0;
 }
 
 uint8_t getNewIR() {
@@ -140,59 +138,31 @@ ISR(TIMER0_COMPA_vect){
 	ti++;
 }
 
-const uint8_t startMaske = 0b00000001;
-
-//ISR(INT0_vect){
-ISR(PCINT0_vect){
-	static uint8_t maske = startMaske;
-	static uint8_t bitA = 0;
-	static uint8_t bitB = 0;
-	static uint8_t t = 0;
-	static uint8_t status = ENDE_IR;
+ISR(INT0_vect) {
+	t = ti;
+	ti = 0;
 	
-if (!getPin(IR_PIN)) {
-		switch (status) {
-			
-			case ENDE_IR:
-				startTimer();
-				ti = 0;
-				status = BIT_IR;
-				break;
-				
-			case BIT_IR:			//erstes Datenbit beginnt hier
-				t = ti;
-				ti = 0;
-				status = BIT_START;
-				//~ if (t < IF_START_WIEDERHOLUNG)	{		//Wiederholung erkannt, Beginn Stopbit
-					//~ status = ENDE_IR;
-					//~ setRepeatData();
-					//~ stopTimer();
-				//~ }
-				break;
-										
-			case BIT_START:							//zweites Bit beginnt hier
-				t = ti;										//Auswertung des ersten Bit
-				ti = 0;
-				if (t > IF_BIT_1_BIT_0)		//40 für log 1 und 20 für log 0
-					data.ergAr[bitB] |= maske;
-				maske <<= 1;
-				bitA++;
-				if (bitA == 8) {					//data.ergAr[0,1,2] ist voll
-					maske = startMaske;
-					bitA = 0;
-					bitB++;
-				}
-				if (bitB == 4) {					//data.ergAr[3] ist voll, Stopbit hat begonnen
-					maske = startMaske;
-					bitA = 0;
-					bitB = 0;
-					status = ENDE_IR;
-					stopTimer();
-					setNewIR();
-				}
-				break;
+	if (t > 100) {			//IR-Start ist geschehen
+		bitCount = 0;
+		byteCount = 0;
+		maske = 1;
+	}
+	else if (t > 40) {		//Logisch 1 ist geschehen
+		data_IR[byteCount] |= maske;
+		maske <<= 1;
+		bitCount++;
+	}
+	else if (t < 30) {		//Logisch 0 ist geschehen
+		maske <<= 1;
+		bitCount++;
+	}
+	if (bitCount == 8) {	//nächstes Byte soll gefüllt werden	
+		bitCount = 0;
+		byteCount++;
+		maske = 1;
+		if (byteCount == 4) {//viertes Byte ist gefüllt
+			setNewIR();
 		}
 	}
 }
-
 
