@@ -18,21 +18,17 @@
 
 #define AUDIO_SW_PIN PINDEF(B, 3)
 
+const uint16_t id 		 = 0x0707;
 
-
-
-enum paraVal {
-	id        = 0x0707,
-	input	  = 0x01,//FE,	//-[->]
-	tv        = 0x02,//FD,
-	volPlus   = 0x07,//08,
-	volMinus  = 0x0B,//F4,
-	muteOnOff = 0x0F,//F0
-};
+const uint16_t volPlus   = 0xF807;
+const uint16_t volMinus  = 0xF40B;
+const uint16_t muteOnOff = 0xF00F;
+const uint16_t input	 = 0xFE01;	//-[->]
+const uint16_t tv        = 0xFD02;
 
 enum audioChanel {
-	chanel1 = 1,
-	chanel2 = 0
+	chanel2 = 0,
+	chanel1 = 1
 };
 
 enum mute {
@@ -68,7 +64,7 @@ void setAudioLevelPlus();
 void setAudioLevelMinus();
 void setMute();
 void sendAudioLevel(int16_t lvl);
-uint8_t sendDataToUsi(uint8_t dat[2]);
+void sendDataToUsi(uint8_t dat[2]);
 void clearIRData();
 
 void test() {
@@ -95,14 +91,14 @@ void test() {
 	clrPin(AUDIO_SW_PIN);
 }
 void te(uint16_t erg) {
-	uint16_t maske = 1;
+	uint16_t maske = 0x8000;
 	clrPin(AUDIO_SW_PIN);
-	for (int i = 0; i < 16; ++i) {
+	for (int i = 16; i > 0; --i) {
 		if (erg & maske)
 			te1();
 		else
 			te0();
-		maske <<= 1;
+		maske >>= 1;
 	}
 	clrPin(AUDIO_SW_PIN);
 }
@@ -119,8 +115,6 @@ void te0() {
 	_delay_us(90);
 }
 
-
-
 //AUDIO_SW_PIN = HIGH: Chanel 1 ist an, Channel 2 ist aus
 //AUDIO_SW_PIN = LOW : Chanel 2 ist an, Channel 1 ist aus
 void setAudioIn(uint8_t aIn) {
@@ -128,6 +122,8 @@ void setAudioIn(uint8_t aIn) {
 		setPin(AUDIO_SW_PIN);	
 	else if (aIn == chanel2)
 		clrPin(AUDIO_SW_PIN);
+	//Die Fernbedienung sendet innerhalb von 325ms 0xFE01 vier Mal, deshalb:
+	_delay_ms(350);
 }
 
 void switchAudioIn() {
@@ -157,6 +153,9 @@ void setMute() {
 		sendAudioLevel(audioLevelMin);
 }
 
+
+
+
 void sendAudioLevel(int16_t lvl) {
 	uint8_t dat[2];
 	dat[0] = writeData | selectPotAll;
@@ -164,14 +163,14 @@ void sendAudioLevel(int16_t lvl) {
 	sendDataToUsi(dat);	
 }
 
-uint8_t sendDataToUsi(uint8_t dat[2]) {
+void sendDataToUsi(uint8_t dat[2]) {
 	initUSI();
 	setDataMode(USI_MODE0);	//Digital-Poti MCP41XXX/42XXX hat SPI-Mode 0
 	clrCS_PIN();			//Abhängig von Usi-Mode
 	transferUsi(dat[0]);
 	transferUsi(dat[1]);
 	setCS_PIN();			//Abhängig von Usi-Mode
-	return 1;
+	endUSI();
 }
 
 void clearIRData() {
@@ -182,37 +181,43 @@ void clearIRData() {
 int main(void) {
 	uint16_t data_id = 0;
 	uint16_t data_val = 0;
-	setupIR();
-	//setArr(uint8_t arr[4]);
+
 	
 	//initUSI();
 	//setDataMode(USI_MODE0);	//Digital-Poti MCP41XXX/42XXX hat SPI-Mode 0
+	
 	setOutput(AUDIO_SW_PIN);
+	setAudioIn(chanel1);
 	
-	
-	setAudioIn(chanel2);
-	
-	resetRepeatData();
-	//~ clearData();
+	setupIR();
 	startTimer();
+	
 	sei();
 	while(1) {
 		if(getNewIR()) {
 			data_id  = (data_IR[1] << 8) | data_IR[0];
 			data_val = (data_IR[3] << 8) | data_IR[2];
-			
-			//data_val = data_IR[2];
-			if (data_id == id) {te(data_val);
+			if (data_id == id) {
 				stopTimer();
-				switch (data_val) {
-					case input:     switchAudioIn();      break;
-					case tv:          te1();                 ;  break;
-					case volPlus:   setAudioLevelPlus();  break;
-					case volMinus:  setAudioLevelMinus(); break;
-					case muteOnOff: setMute();            break;
-					default: /*test();*/  break;
-				}
 				
+				if (data_val == volPlus) {
+					setAudioLevelPlus();
+				}
+				else if (data_val == volMinus) {
+					setAudioLevelMinus();
+				}
+				else if (data_val == muteOnOff) {
+					setMute();
+				}
+				else if (data_val == input) {
+					switchAudioIn();
+				}
+				else if (data_val == tv) {
+					;
+				}
+				else {
+					;
+				}				
 			} 
 			resetNewIR();
 			clearIRData();

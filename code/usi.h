@@ -14,4 +14,4 @@ void setDataMode(uint8_t mode);
 void setCS_PIN();
 void clrCS_PIN();
 uint8_t transferUsi(uint8_t data);
-void end();
+void endUSI();

@@ -18,26 +18,27 @@
  * 
  * Start-bit:	4,5ms	
  * Pause:		4,5ms
- * =			9ms		Count 750
+ * =			9ms		Count 
  * 
  * 0-bit: 		0,55ms
  * Pause:		0,55ms
- * =			1,1ms	Count 91,7
+ * =			1,1ms	Count 
  * 
  * 1-bit: 		0,55ms	
  * Pause:		1,65ms
- * =			2,2ms	Count 183,3
+ * =			2,2ms	Count 
  * 
- * stop: 		0,55ms	Count 45,8
+ * stop: 		0,55ms	Count 
  * 
  * Wiederholung
  * nach 47 ms
  * 
- * ID    = 0x0707
- * Vol + = 0x0708
- * Vol - = 0x0BF4
- * TV    = 0x02FD
- * -[->] = 0x01FE
+ * ID    	 = 0x0707
+ * volPlus   = 0xF807
+ * volMinus  = 0xF40B
+ * muteOnOff = 0xF00F
+ * input	 = 0xFE01	//-[->]
+ * tv        = 0xFD02
  * 
  */
 
@@ -47,10 +48,9 @@
 #include "uart_hard.h"
 #include "main.h"
 
-const uint16_t start_laenge = 750;
-const uint16_t bit1_laenge = 183;
-const uint16_t bit0_laenge = 92;
-
+const uint16_t start_laenge = 159;
+const uint16_t bit1_laenge = 49;
+const uint16_t bit0_laenge = 23;
 
 volatile uint16_t ti;
 volatile uint16_t t;
@@ -67,7 +67,6 @@ void setupInt0();
 
 uint8_t isTimerRunning();
 void setNewIR();
-void setRepeatData();
 uint16_t getTime();
 
 void setupIR() {
@@ -122,22 +121,11 @@ void setNewIR() {
 	newIR = 1;
 }
 
-void setRepeatData() {
-	repeatData = 1;
-}
-
-void resetRepeatData() {
-	repeatData = 0;
-}
-
-uint8_t getRepeatData() {
-	return repeatData;
-}
-
 ISR(TIMER0_COMPA_vect){
 	ti++;
 }
 
+//Zeiten mit Oszi ermittelt
 ISR(INT0_vect) {
 	t = ti;
 	ti = 0;
