@@ -72,10 +72,11 @@ void clrCS_PIN() {
 //Interrupts are inhibited during each byte transfer to ensure a consistent bit clock period.
 uint8_t transferUsi(uint8_t data) {
     USIDR = data;
-    USISR &= ~(1 << USIOIF);                // clear counter and counter overflow interrupt flag
+    USISR &= ~(1 << USIOIF);            // clear counter and counter overflow interrupt flag
     ATOMIC_BLOCK(ATOMIC_RESTORESTATE)   // ensure a consistent clock period
     {
-        while ( !(USISR & (1 << USIOIF)) ) USICR |= (1 << USITC);
+        while ( !(USISR & (1 << USIOIF)) ) 
+			USICR |= (1 << USITC);
     }
     return USIDR;
 }
@@ -83,5 +84,5 @@ uint8_t transferUsi(uint8_t data) {
 //Disables the SPI bus
 void endUSI() {
     USICR &= ~((1 << USIWM1) | (1 << USIWM0));
-    setPin(USCK_PIN);
+    //setPin(USCK_PIN);
 }

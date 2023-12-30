@@ -6,6 +6,7 @@
 #define IR_PIN PINDEF(B, 2)
 
 void setupIR();
+void stopIR();
 void startTimer();
 void stopTimer();
 void resetNewIR();

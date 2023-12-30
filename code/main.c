@@ -157,21 +157,35 @@ void setMute() {
 
 
 void sendAudioLevel(int16_t lvl) {
-	uint8_t dat[2];
-	dat[0] = writeData | selectPotAll;
-	dat[1] = (uint8_t)(lvl & 255);
-	sendDataToUsi(dat);	
+	initUSI();
+	setDataMode(USI_MODE0);
+	clrCS_PIN();
+	transferUsi(writeData | selectPotAll);
+	setCS_PIN();
+	
+initUSI();
+	setDataMode(USI_MODE0);
+
+	clrCS_PIN();
+	transferUsi(0b10101010);
+	setCS_PIN();
+	endUSI();
+	
+	//~ uint8_t dat[2];
+	//~ dat[0] = writeData | selectPotAll;
+	//~ dat[1] = (uint8_t)(lvl & 255);
+	//~ sendDataToUsi(dat);	
 }
 
-void sendDataToUsi(uint8_t dat[2]) {
-	initUSI();
-	setDataMode(USI_MODE0);	//Digital-Poti MCP41XXX/42XXX hat SPI-Mode 0
-	clrCS_PIN();			//Abhängig von Usi-Mode
-	transferUsi(dat[0]);
-	transferUsi(dat[1]);
-	setCS_PIN();			//Abhängig von Usi-Mode
-	endUSI();
-}
+//~ void sendDataToUsi(uint8_t dat[2]) {
+	//~ initUSI();
+	//~ setDataMode(USI_MODE0);	//Digital-Poti MCP41XXX/42XXX hat SPI-Mode 0
+	//~ clrCS_PIN();			//Abhängig von Usi-Mode
+	//~ transferUsi(dat[0]);
+	//~ transferUsi(dat[1]);
+	//~ setCS_PIN();			//Abhängig von Usi-Mode
+	//~ endUSI();
+//~ }
 
 void clearIRData() {
 	for (int i = 0; i < 4; ++i)
@@ -198,7 +212,7 @@ int main(void) {
 			data_id  = (data_IR[1] << 8) | data_IR[0];
 			data_val = (data_IR[3] << 8) | data_IR[2];
 			if (data_id == id) {
-				stopTimer();
+				stopIR();
 				
 				if (data_val == volPlus) {
 					setAudioLevelPlus();
@@ -222,7 +236,6 @@ int main(void) {
 			resetNewIR();
 			clearIRData();
 			setupIR();
-			startTimer();
 		}
 		
 		//schlafen();

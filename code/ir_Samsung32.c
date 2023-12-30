@@ -78,8 +78,18 @@ void setupIR() {
 	byteCount = 0;
 	t = 0;
 	
+	setInput(IR_PIN);
+	setPin(IR_PIN);
+	
 	setupInt0();
 	setupTimer();
+	startTimer();
+}
+
+void stopIR() {
+	stopTimer();
+	GIMSK &= ~(1 << INT0);
+	TIMSK &= ~(1 << OCIE0A);
 }
 
 void setupInt0() {
@@ -90,7 +100,6 @@ void setupInt0() {
 void setupTimer(){ 
 	TCCR0A = 1 << WGM01;
 	TIMSK |= 1 << OCIE0A;       // Enable output compare interrupt
-    stopTimer();
     OCR0A = 12;
 }
 
