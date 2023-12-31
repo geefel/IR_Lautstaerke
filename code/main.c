@@ -8,12 +8,19 @@
  *                               GND  4|    |5  PB0 MOSI DI   SDA AIN0 OC0A !OC1A PCINT0 AREF
  *                                     +----+
  */
-
+/*
+ * #define IR_PIN   PINDEF(B, 2)		//in ir_Samsung.h
+ * #define SCK_PIN	PINDEF(B, 0)		//in spi_soft.h		MCP42010-I/P 2
+ * #define DO_PIN 	PINDEF(B, 1)		//in spi_soft.h		MCP42010-I/P 3
+ * #define CS_PIN 	PINDEF(B, 4)		//in spi_soft.h		MCP42010-I/P 1
+ * #define AUDIO_SW_PIN PINDEF(B, 3)	//in Main.c
+*/
 
 #include <util/delay.h>
 #include <avr/interrupt.h>
 #include "ir_Samsung32.h"
 #include "usi.h"
+#include "spi_soft.h"
 #include "main.h"
 
 #define AUDIO_SW_PIN PINDEF(B, 3)
@@ -153,39 +160,11 @@ void setMute() {
 		sendAudioLevel(audioLevelMin);
 }
 
-
-
-
 void sendAudioLevel(int16_t lvl) {
-	initUSI();
-	setDataMode(USI_MODE0);
-	clrCS_PIN();
-	transferUsi(writeData | selectPotAll);
-	setCS_PIN();
-	
-initUSI();
-	setDataMode(USI_MODE0);
-
-	clrCS_PIN();
-	transferUsi(0b10101010);
-	setCS_PIN();
-	endUSI();
-	
-	//~ uint8_t dat[2];
-	//~ dat[0] = writeData | selectPotAll;
-	//~ dat[1] = (uint8_t)(lvl & 255);
-	//~ sendDataToUsi(dat);	
+	initSPI();
+	lvl |= ((writeData | selectPotAll) << 8);
+	sendData16(lvl);
 }
-
-//~ void sendDataToUsi(uint8_t dat[2]) {
-	//~ initUSI();
-	//~ setDataMode(USI_MODE0);	//Digital-Poti MCP41XXX/42XXX hat SPI-Mode 0
-	//~ clrCS_PIN();			//Abhängig von Usi-Mode
-	//~ transferUsi(dat[0]);
-	//~ transferUsi(dat[1]);
-	//~ setCS_PIN();			//Abhängig von Usi-Mode
-	//~ endUSI();
-//~ }
 
 void clearIRData() {
 	for (int i = 0; i < 4; ++i)
@@ -195,10 +174,6 @@ void clearIRData() {
 int main(void) {
 	uint16_t data_id = 0;
 	uint16_t data_val = 0;
-
-	
-	//initUSI();
-	//setDataMode(USI_MODE0);	//Digital-Poti MCP41XXX/42XXX hat SPI-Mode 0
 	
 	setOutput(AUDIO_SW_PIN);
 	setAudioIn(chanel1);

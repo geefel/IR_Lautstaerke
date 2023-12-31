@@ -1,4 +1,4 @@
-SRCS=main.c ir_Samsung32.c usi.c
+SRCS=main.c ir_Samsung32.c spi_soft.c
 TARGET=IR_ATmega
 
 #ATmega48A/PA/88A/PA/168A/PA/328/P
